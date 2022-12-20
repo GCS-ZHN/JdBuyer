@@ -25,5 +25,7 @@ class Config(object):
     def getboolean(self, section, name):
         return self._config.getboolean(section, name)
 
+    def getint(self, section, name):
+        return self._config.getint(section, name)
 
 global_config = Config()
