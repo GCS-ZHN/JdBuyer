@@ -11,6 +11,7 @@ from utils import (
     open_image,
     send_wechat
 )
+from concurrence import parallel, ParallelManager
 
 
 class Buyer(object):
@@ -62,6 +63,7 @@ class Buyer(object):
         self.session.saveCookies()
 
     ############## 外部方法 #############
+    @parallel
     def buyItemInStock(self, skuId, areaId, skuNum=1, stockInterval=3, submitRetry=3, submitInterval=5, buyTime='2022-08-06 00:00:00'):
         """根据库存自动下单商品
         :skuId 商品sku
@@ -86,7 +88,9 @@ class Buyer(object):
                         logger.info('下单成功')
                         if self.enableWx:
                             send_wechat(
-                                message='JdBuyerApp', desp='您的商品已下单成功，请及时支付订单', sckey=self.scKey)
+                                message='JdBuyerApp', 
+                                desp='您的商品{0}已下单成功，请及时支付订单'.format(skuId), 
+                                sckey=self.scKey)
                         return
             except Exception as e:
                 logger.error(e)
@@ -94,23 +98,32 @@ class Buyer(object):
 
 
 if __name__ == '__main__':
-
-    # 商品sku
-    skuId = '100015253059'
-    # 区域id(可根据工程 area_id 目录查找)
-    areaId = '1_2901_55554_0'
-    # 购买数量
-    skuNum = 1
+    import json
+    from argparse import ArgumentParser
+    parser = ArgumentParser("JdBuyerApp")
+    parser.add_argument("--config", type=str, default="shopping_cart.json", help="购物车配置文件")
+    args = parser.parse_args()
     # 库存查询间隔(秒)
-    stockInterval = 3
+    stockInterval = global_config.getint('config', 'stock_interval')
     # 监听库存后尝试下单次数
-    submitRetry = 3
+    submitRetry = global_config.getint('config', 'submit_retry')
     # 下单尝试间隔(秒)
-    submitInterval = 5
-    # 程序开始执行时间(晚于当前时间立即执行，适用于定时抢购类)
-    buyTime = '2022-10-10 00:00:00'
-
+    submitInterval = global_config.getint('config', 'submit_interval')
+    # 默认地址
+    default_area_id = global_config.get('config', 'default_area_id')
+    with open(args.config, 'r', encoding="utf-8") as f:
+        config = json.load(f)
     buyer = Buyer()  # 初始化
     buyer.loginByQrCode()
-    buyer.buyItemInStock(skuId, areaId, skuNum, stockInterval,
-                         submitRetry, submitInterval, buyTime)
+    with ParallelManager() as pm:
+        for idx, good in enumerate(config["goods"], 1):
+            if "skuid" not in good:
+                logger.error("第{0}个商品配置错误，缺少skuid".format(idx))
+                exit(1)
+            skuId = good["skuid"]
+            areaId = good.get("areaid", default_area_id)
+            skuNum = good.get("count", 1)
+            buyTime = good.get("buytime", "1970-01-01 00:00:00")
+            buyer.buyItemInStock(skuId, areaId, skuNum, stockInterval,
+                                submitRetry, submitInterval, buyTime)
+            logger.info('商品{0}监控线程已启动'.format(skuId))
