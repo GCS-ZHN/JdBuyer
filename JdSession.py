@@ -8,6 +8,7 @@ import time
 import requests
 
 from lxml import etree
+from exception import JDException
 
 DEFAULT_TIMEOUT = 10
 DEFAULT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36'
@@ -167,6 +168,8 @@ class Session(object):
         :param skuId
         """
         resp = self.getItemDetail(skuId).json()
+        if "shopInfo" not in resp:
+            raise JDException("商品{0}信息获取失败，请确认信息无误！".format(skuId))
         shopId = resp['shopInfo']['shop']['shopId']
         detail = dict(venderId=shopId)
         if 'YuShouInfo' in resp:
