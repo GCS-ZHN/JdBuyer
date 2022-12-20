@@ -103,17 +103,14 @@ if __name__ == '__main__':
     parser = ArgumentParser("JdBuyerApp")
     parser.add_argument("--config", type=str, default="shopping_cart.json", help="购物车配置文件")
     args = parser.parse_args()
-    # 库存查询间隔(秒)
-    stockInterval = global_config.getint('config', 'stock_interval')
-    # 监听库存后尝试下单次数
-    submitRetry = global_config.getint('config', 'submit_retry')
-    # 下单尝试间隔(秒)
-    submitInterval = global_config.getint('config', 'submit_interval')
-    # 默认地址
+    default_stock_interval = global_config.getint('config', 'default_stock_interval')
+    default_submit_retry = global_config.getint('config', 'default_submit_retry')
+    default_submit_nterval = global_config.getint('config', 'default_submit_interval')
     default_area_id = global_config.get('config', 'default_area_id')
+    default_buy_time = "1970-01-01 00:00:00"
     with open(args.config, 'r', encoding="utf-8") as f:
         config = json.load(f)
-    buyer = Buyer()  # 初始化
+    buyer = Buyer()
     buyer.loginByQrCode()
     with ParallelManager() as pm:
         for idx, good in enumerate(config["goods"], 1):
@@ -123,7 +120,13 @@ if __name__ == '__main__':
             skuId = good["skuid"]
             areaId = good.get("areaid", default_area_id)
             skuNum = good.get("count", 1)
-            buyTime = good.get("buytime", "1970-01-01 00:00:00")
+            buyTime = good.get("buytime", default_buy_time)
+            stockInterval = good.get("stockinterval", default_stock_interval)
+            submitRetry = good.get("submitretry", default_submit_retry)
+            submitInterval = good.get("submitinterval", default_submit_nterval)
             buyer.buyItemInStock(skuId, areaId, skuNum, stockInterval,
                                 submitRetry, submitInterval, buyTime)
-            logger.info('商品{0}监控线程已启动'.format(skuId))
+            if buyTime != default_buy_time:
+                logger.info('商品{0}监控线程已启动，抢购开始时间{1}'.format(skuId, buyTime))
+            else:
+                logger.info('商品{0}监控线程已启动'.format(skuId))
